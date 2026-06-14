@@ -19,7 +19,8 @@ async def run_once() -> None:
 
     try:
         tickers = await asterdex.get_all_tickers()
-        symbols = [str(item.get("symbol", "")).strip().upper() for item in tickers if str(item.get("symbol")).endswith("USDT")]
+        price_map = {str(item.get("symbol", "")).strip().upper(): float(item.get("markPrice", 0) or 0) for item in tickers}
+        symbols = [symbol for symbol in price_map if symbol.endswith("USDT")]
         if not symbols:
             logger.warning("No tickers returned by AsterDEX; nothing to monitor")
             return
@@ -27,6 +28,8 @@ async def run_once() -> None:
         results = await asterdex.get_open_interest_for_symbols(symbols)
         for payload in results:
             try:
+                symbol = str(payload.get("symbol", "")).strip().upper()
+                payload["price"] = price_map.get(symbol, 0.0)
                 await monitor.process_open_interest(payload)
             except Exception as exc:
                 logger.exception("Failed to process OI payload for {}: {}", payload.get("symbol"), exc)

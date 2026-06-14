@@ -22,6 +22,7 @@ class SplashMonitor:
     async def process_open_interest(self, payload: dict) -> bool:
         symbol = str(payload.get("symbol", "")).strip().upper()
         oi = float(payload.get("openInterest", 0) or 0)
+        price = float(payload.get("price", 0) or 0)
         timestamp_ms = int(payload.get("time", 0) or 0)
         current_ts = timestamp_ms // 1000 if timestamp_ms > 1_000_000_000_000 else int(timestamp_ms)
 
@@ -29,16 +30,18 @@ class SplashMonitor:
             logger.warning("Skipping invalid OI payload for {}", symbol)
             return False
 
-        await self.redis.add_sample(symbol, oi, current_ts)
+        await self.redis.add_sample(symbol, oi, price, current_ts)
         await self.redis.cleanup_old(symbol, current_ts)
 
-        match = await self.redis.find_oldest_match(symbol, oi, current_ts)
+        match = await self.redis.find_oldest_match(symbol, oi, price, current_ts)
         if not match:
             return False
 
         old_ts = int(match["old_timestamp"])
         old_oi = float(match["old_oi"])
+        old_price = float(match.get("old_price", 0.0))
         increase_pct = float(match["increase_pct"])
+        price_change_pct = float(match.get("price_change_pct", 0.0))
         elapsed_seconds = max(0, current_ts - old_ts)
 
         now = datetime.now(timezone.utc)
@@ -49,7 +52,10 @@ class SplashMonitor:
             f"    Symbol: <code>{symbol}</code>\n"
             f"    OI Increase: +{increase_pct:.2f}%\n"
             f"    Time: {self.format_time(elapsed_seconds)}\n"
-            f"    OI Change: {int(old_oi):,} → {int(oi):,}\n\n"
+            f"    OI Change (tokens): {int(old_oi):,} → {int(oi):,}\n"
+            f"    OI Change (USD): ${old_oi * old_price:,.0f} → ${oi * price:,.0f}\n\n"
+            f"    📈 Price Change: {price_change_pct:+.2f}%\n"
+            f"    Price: ${old_price:.4f} → ${price:.4f}\n\n"
             f"    Timestamp: {timestamp_text}"
         )
 
