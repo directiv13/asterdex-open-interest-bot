@@ -1,8 +1,8 @@
-name: Deploy Bot
+name: Deploy to VPS
 
 on:
   push:
-    branches: [main]
+    branches: ["main"]
   workflow_dispatch:
 
 jobs:
@@ -12,13 +12,27 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Deploy to VPS
-        uses: appleboy/ssh-action@v1.1.0
+      - name: Copy repository to VPS
+        uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          source: "."
+          target: ${{ secrets.REMOTE_PATH }}
+
+      - name: Restart application on VPS (docker compose)
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
           script: |
-            cd /opt/asterdex-open-interest-bot
-            git pull
-            docker compose up --build -d
+            set -e
+            cd ${{ secrets.REMOTE_PATH }}
+
+            # ensure docker and docker compose are available on the VPS
+            docker compose pull --ignore-pull-failures || true
+            docker compose up -d --build
