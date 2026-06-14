@@ -6,6 +6,8 @@ from src.utilities.logger import logger
 from src.utilities.redis import RedisOIHistory
 from src.utilities.telegram import TelegramNotifier
 
+from config.settings import settings
+
 
 class SplashMonitor:
     def __init__(self, redis_client: RedisOIHistory, telegram_client: TelegramNotifier) -> None:
@@ -33,7 +35,13 @@ class SplashMonitor:
         await self.redis.add_sample(symbol, oi, price, current_ts)
         await self.redis.cleanup_old(symbol, current_ts)
 
-        match = await self.redis.find_oldest_match(symbol, oi, price, current_ts)
+        oi_usd = oi * price
+
+        if(oi_usd < settings.OI_THRESHOLD_USD):
+            logger.info("OI for {} is below threshold: {}", symbol, oi)
+            return False
+
+        match = await self.redis.find_oldest_match(symbol=symbol, current_oi=oi, current_price=price, current_ts=current_ts, threshold=1 + settings.OI_THRESHOLD_PERCENT / 100.0)
         if not match:
             return False
 
@@ -53,7 +61,7 @@ class SplashMonitor:
             f"    OI Increase: +{increase_pct:.2f}%\n"
             f"    Time: {self.format_time(elapsed_seconds)}\n"
             f"    OI Change (tokens): {int(old_oi):,} → {int(oi):,}\n"
-            f"    OI Change (USD): ${old_oi * old_price:,.0f} → ${oi * price:,.0f}\n\n"
+            f"    OI Change (USD): ${old_oi * old_price:,.0f} → ${oi_usd:,.0f}\n\n"
             f"    📈 Price Change: {price_change_pct:+.2f}%\n"
             f"    Price: ${old_price:.4f} → ${price:.4f}\n\n"
             f"    Timestamp: {timestamp_text}"

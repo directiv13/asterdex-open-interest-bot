@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     TELEGRAM_CHANNEL_THREAD_ID: int = 0
     REDIS_URL: str = "redis://localhost:6379/0"
     ASTERDEX_BASE_URL: str = "https://fapi.asterdex.com"
+    OI_THRESHOLD_PERCENT: float = 15.0
+    OI_THRESHOLD_USD: int = 100_000
     POLL_INTERVAL_SECONDS: int = 60
     HISTORY_TTL_SECONDS: int = 3600
 
