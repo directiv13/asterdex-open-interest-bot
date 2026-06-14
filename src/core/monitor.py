@@ -38,7 +38,7 @@ class SplashMonitor:
         oi_usd = oi * price
 
         if(oi_usd < settings.OI_THRESHOLD_USD):
-            logger.info("OI for {} is below threshold: {}", symbol, oi)
+            logger.info("OI for {} is below threshold: ${}", symbol, oi_usd)
             return False
 
         match = await self.redis.find_oldest_match(symbol=symbol, current_oi=oi, current_price=price, current_ts=current_ts, threshold=1 + settings.OI_THRESHOLD_PERCENT / 100.0)
